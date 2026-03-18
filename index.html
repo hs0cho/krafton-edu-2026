@@ -569,6 +569,19 @@ function getCourses(id){const gs=CAT_GROUPS[id]||[];return D.filter(d=>gs.includ
 
 function filterFn(d,fid){
   if(fid==='all')return true;
+  // 구글 시트에서 주제가 지정된 경우 우선 사용
+  const sheetTopic = d[8]||'';
+  const topicLabelMap = {
+    'fx':'이펙트·FX','char':'캐릭터·모델링','anim':'애니메이션','blender':'블렌더',
+    'unreal':'언리얼·배경','tex':'텍스처·리깅','illust':'일러스트·드로잉',
+    'backend':'백엔드·Java','infra':'인프라·DevOps','front':'프론트엔드','game':'게임 개발',
+    'ai':'AI','ml':'ML·딥러닝','de':'데이터 엔지니어링','cloud':'클라우드·인프라',
+    'pm':'PM·기획','mkt':'마케팅','data':'데이터·분석','design':'디자인·영상',
+    'legal':'법무·컴플라이언스','finance':'재무·회계','hr':'HR·인사','tool':'업무 도구',
+    'ai_data':'AI·LLM',
+  };
+  if(sheetTopic && topicLabelMap[fid] && sheetTopic===topicLabelMap[fid]) return true;
+  if(sheetTopic && topicLabelMap[fid] && sheetTopic!==topicLabelMap[fid] && sheetTopic!=='') return false;
   const n=d[0];
   const fns={
     // ── Art 필터 ────────────────────────────────────────────────
@@ -1099,6 +1112,44 @@ function saveFilterEdit(){
 }
 
 
-// ── 초기화 ───
-renderCards();
+// ── 초기화 ───────────────────────────────────────────────────────
+const SHEET_URL = 'https://docs.google.com/spreadsheets/d/10SBAM2qh-F8xnaSD186zHJWXvzA6WxN9udqu-ETeVRQ/export?format=csv&gid=394121108';
+const TYPE_MAP = {'추천교육':0,'AI지원과정':1,'AI추천교육':2};
+
+function parseCSV(text){
+  const lines = text.trim().split('\n');
+  const result = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = parseCSVLine(lines[i]);
+    if(cols.length<7) continue;
+    const [name,org,url,type,desc,sub,group,order,topic] = cols.map(c=>c.trim());
+    result.push([name, org, url, TYPE_MAP[type]??0, desc, sub, group, Number(order)||i, topic||'']);
+  }
+  // 직군+유형별 순서 정렬
+  result.sort((a,b)=>{
+    if(a[6]!==b[6]) return 0;
+    if(a[3]!==b[3]) return 0;
+    return a[7]-b[7];
+  });
+  return result;
+}
+
+function initApp(){
+  renderCards();
+  fetch(SHEET_URL)
+    .then(r=>r.text())
+    .then(text=>{
+      const sheetData = parseCSV(text);
+      if(sheetData.length > 0){
+        D = sheetData;
+        renderCards();
+        if(curCat) renderDet();
+      }
+    })
+    .catch(()=>{}); // 실패 시 DEFAULT_DATA 유지
+}
+
+initApp();
 </script>
+</body>
+</html>
